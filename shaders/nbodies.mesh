@@ -4,6 +4,8 @@
 #extension GL_EXT_scalar_block_layout : require
 
 #define LOCAL_GROUP_SIZE 32
+#define BODIES_PER_INVOCATION 8
+#define NUM_PRIMITIVES LOCAL_GROUP_SIZE * BODIES_PER_INVOCATION
 
 struct Body {
 	vec2 position;
@@ -23,31 +25,44 @@ layout(push_constant, scalar) uniform constants {
 } pcs;
 
 layout(local_size_x = LOCAL_GROUP_SIZE) in;
-layout(points, max_vertices = LOCAL_GROUP_SIZE, max_primitives = LOCAL_GROUP_SIZE) out;
+layout(points, max_vertices = NUM_PRIMITIVES, max_primitives = NUM_PRIMITIVES) out;
 
 float pointSize(float mass) {
     return 9.5e-7f * mass + 4.9999905;   
 }
 
 void main() {
-    Body body = pcs.inBodies.bodies[gl_GlobalInvocationID.x];
+    SetMeshOutputsEXT(NUM_PRIMITIVES, NUM_PRIMITIVES);
 
-    vec2 acceleration = vec2(0.0f);
-    for(uint i = 0; i < gl_NumWorkGroups.x * LOCAL_GROUP_SIZE; i++) {
-        vec2 direction = pcs.inBodies.bodies[i].position - body.position;
-        float magnitude = length(direction);
-        acceleration += magnitude == 0.0f ? vec2(0.0f) : normalize(direction) / magnitude / magnitude * pcs.dt * pcs.inBodies.bodies[i].mass;
+    Body localBodies[BODIES_PER_INVOCATION];
+    vec2 accelerations[BODIES_PER_INVOCATION];
+    for(uint i = 0; i < BODIES_PER_INVOCATION; i++) {
+        uint globalIndex = gl_GlobalInvocationID.x * BODIES_PER_INVOCATION + i;
+        localBodies[i] = pcs.inBodies.bodies[globalIndex];
+
+        accelerations[i] = vec2(0.0f);
     }
 
-    body.velocity += acceleration * pcs.dt;
-    body.position += body.velocity * pcs.dt;
+    for(uint i = 0; i < gl_NumWorkGroups.x * LOCAL_GROUP_SIZE; i++) {
+        Body other = pcs.inBodies.bodies[i];
 
-    pcs.outBodies.bodies[gl_GlobalInvocationID.x] = body;
+        for(uint j = 0; j < BODIES_PER_INVOCATION; j++) {
+            vec2 direction = other.position - localBodies[j].position;
+            float magnitude = length(direction);
+            accelerations[j] += magnitude == 0.0f ? vec2(0.0f) : normalize(direction) / magnitude / magnitude * pcs.dt * other.mass;
+        }
+    }
 
-    SetMeshOutputsEXT(LOCAL_GROUP_SIZE, LOCAL_GROUP_SIZE);
+    for(uint i = 0; i < BODIES_PER_INVOCATION; i++) {
+        uint localIndex = gl_LocalInvocationID.x * BODIES_PER_INVOCATION + i;
+        uint globalIndex = gl_GlobalInvocationID.x * BODIES_PER_INVOCATION + i;
 
-    gl_MeshVerticesEXT[gl_LocalInvocationID.x].gl_Position = pcs.projMatrix * vec4(body.position, 0.0f, 1.0f);
-    gl_MeshVerticesEXT[gl_LocalInvocationID.x].gl_PointSize = pointSize(body.mass);
+        localBodies[i].velocity += accelerations[i] * pcs.dt;
+        localBodies[i].position += localBodies[i].velocity * pcs.dt;
 
-    gl_PrimitivePointIndicesEXT[gl_LocalInvocationID.x] = gl_LocalInvocationID.x;
+        pcs.outBodies.bodies[globalIndex] = localBodies[i];
+        gl_MeshVerticesEXT[localIndex].gl_Position = pcs.projMatrix * vec4(localBodies[i].position, 0.0f, 1.0f);
+        gl_MeshVerticesEXT[localIndex].gl_PointSize = pointSize(localBodies[i].mass);
+        gl_PrimitivePointIndicesEXT[localIndex] = localIndex;
+    }
 }

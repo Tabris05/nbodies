@@ -319,7 +319,7 @@ void Application::run() {
 			{ { 0.0f, 0.0f, 0.0f, 0.0f } }
 		);
 		frameData.cmdBuffer.beginRendering({ {}, { { 0, 0 }, { static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height) } }, 1, {}, colorAttachment });
-		frameData.cmdBuffer.drawMeshTasksEXT(m_numBodies / m_localGroupSize, 1, 1, m_deviceDispatcher);
+		frameData.cmdBuffer.drawMeshTasksEXT(m_numBodies / m_localGroupSize / m_bodiesPerInvocation, 1, 1, m_deviceDispatcher);
 		frameData.cmdBuffer.endRendering();
 		
 		transitionImage(

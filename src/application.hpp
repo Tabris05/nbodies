@@ -23,7 +23,8 @@ class Application {
 	private:
 		static constexpr size_t m_framesInFlight = 2;
 		static constexpr size_t m_localGroupSize = 32;
-		static constexpr size_t m_numBodies = m_localGroupSize * 2048;
+		static constexpr size_t m_bodiesPerInvocation = 8;
+		static constexpr size_t m_numBodies = 65536;
 
 		struct PushConstants {
 			glm::mat4 projMatrix;
@@ -78,7 +79,7 @@ class Application {
 
 		std::vector<const char*> m_layers{
 #ifdef _DEBUG
-		"VK_LAYER_KHRONOS_validation"
+			"VK_LAYER_KHRONOS_validation"
 #endif
 		};
 
