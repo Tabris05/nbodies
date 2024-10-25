@@ -24,7 +24,7 @@ class Application {
 		static constexpr size_t m_framesInFlight = 2;
 		static constexpr size_t m_localGroupSize = 32;
 		static constexpr size_t m_bodiesPerInvocation = 8;
-		static constexpr size_t m_numBodies = 65536;
+		static constexpr size_t m_numBodies = 1 << 17;
 
 		struct PushConstants {
 			glm::mat4 projMatrix;

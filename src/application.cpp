@@ -112,7 +112,6 @@ Application::Application() {
 			vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eFragment, fragmentShader, "main")
 		};
 
-		vk::Format colorAttachmentFormat = vk::Format::eR8Uint;
 		std::vector<vk::DynamicState> dynamicStates{ vk::DynamicState::eViewport, vk::DynamicState::eScissor };
 
 		vk::PipelineViewportStateCreateInfo viewportInfo({}, 1, {}, 1);
@@ -162,52 +161,49 @@ Application::Application() {
 		std::mt19937_64 generator;
 		std::uniform_real_distribution<float> angle(0.0f, 2.0f * std::numbers::pi_v<float>);
 		std::uniform_real_distribution<float> radius(0.0f, 0.5f);
-		glm::vec2 circleCenter(m_width / 2.0f, m_height / 2.0f);
 
 		//*reinterpret_cast<Body*>(std::get<std::byte*>(stagingBuffer.ptr)) = Body{
-		//	circleCenter,
+		//	glm::vec2(0.0f),
 		//	glm::vec2(0.0f),
 		//	100000000.0f
 		//};
 		//
 		//for(size_t i = 1; i < m_numBodies; i++) {
 		//	float theta = angle(generator);
-		//	float r = (1.0f - std::sqrtf(radius(generator))) * std::min(m_width, m_height) / 3.0f;
+		//	float r = (1.0f - std::sqrtf(radius(generator))) * 375.0f;
 		//
-		//	glm::vec2 position(r * std::cosf(theta) + m_width / 2.0f, r * std::sinf(theta) + m_height / 2.0f);
-		//	glm::vec2 distance = position - circleCenter;
-		//	glm::vec2 velocity = glm::normalize(glm::vec2(distance.y, -distance.x)) * 2000000.0f / glm::dot(distance, distance);
+		//	glm::vec2 position(r * std::cosf(theta), r * std::sinf(theta));
+		//	glm::vec2 velocity = glm::normalize(glm::vec2(position.y, -position.x)) * 1500000.0f / glm::dot(position, position);
 		//
 		//	reinterpret_cast<Body*>(std::get<std::byte*>(stagingBuffer.ptr))[i] = Body{
 		//		position,
 		//		velocity,
 		//		10.0f
 		//	};
-		// }
+		//}
 
 		std::bernoulli_distribution dist;
 		reinterpret_cast<Body*>(std::get<std::byte*>(stagingBuffer.ptr))[0] = Body{
-			circleCenter - glm::vec2(m_width / 4.0f, 0.0f),
-			glm::vec2(15.0f, 15.0f * 9.0f / 16.0f),
-			400000000.0f
+			glm::vec2(-750.0f, 0.0f),
+			glm::vec2(15.0f, 15.0f),
+			500000000.0f
 		};
-
+		
 		reinterpret_cast<Body*>(std::get<std::byte*>(stagingBuffer.ptr))[1] = Body{
-			circleCenter + glm::vec2(m_width / 4.0f, 0.0f),
-			glm::vec2(-15.0f, -15.0f * 9.0f / 16.0f),
-			400000000.0f
+			glm::vec2(750.0f, 0.0f),
+			glm::vec2(-15.0f, -15.0f),
+			500000000.0f
 		};
 		
 		for(size_t i = 2; i < m_numBodies; i++) {
 			float theta = angle(generator);
-			float r = (1.0f - std::sqrtf(radius(generator))) * std::min(m_width, m_height) / 3.0f;
+			float r = (1.0f - std::sqrtf(radius(generator))) * 500.0f;
 		
-			glm::vec2 position(r * std::cosf(theta) + m_width / 2.0f, r * std::sinf(theta) + m_height / 2.0f);
-			glm::vec2 distance = position - circleCenter;
-			glm::vec2 velocity = glm::normalize(glm::vec2(distance.y, -distance.x)) * 1000000.0f / glm::dot(distance, distance);
+			glm::vec2 position(r * std::cosf(theta), r * std::sinf(theta));
+			glm::vec2 velocity = glm::normalize(glm::vec2(position.y, -position.x)) * 3000000.0f / glm::dot(position, position);
 		
 			reinterpret_cast<Body*>(std::get<std::byte*>(stagingBuffer.ptr))[i] = Body{
-				position + (dist(generator) ? glm::vec2(m_width / 4.0f, 0.0f) : glm::vec2(-m_width / 4.0f, 0.0f)),
+				position + (dist(generator) ? glm::vec2(750.0f, 0.0f) : glm::vec2(-750.0f, 0.0f)),
 				velocity,
 				10.0f
 			};
@@ -266,8 +262,7 @@ void Application::run() {
 		m_device.waitForFences(frameData.fence, vk::True, std::numeric_limits<uint64_t>::max());
 
 		auto acquireResult = m_device.acquireNextImageKHR(m_swapchain, std::numeric_limits<uint64_t>::max(), frameData.acquireSem);
-		if(acquireResult.result != vk::Result::eSuccess || m_resizePending) {
-			m_resizePending = false;
+		if(acquireResult.result == vk::Result::eErrorOutOfDateKHR) {
 			recreateSwapchain();
 			continue;
 		}
@@ -288,11 +283,22 @@ void Application::run() {
 
 		float currentTime = glfwGetTime();
 
+		glm::mat4 projection(0.0f);
+
+		if(m_width > m_height) {
+			float aspectRatio = static_cast<float>(m_width) / m_height;
+			projection = glm::ortho(-1000.0f * aspectRatio, 1000.0f * aspectRatio, -1000.0f, 1000.0f, 0.0f, 1.0f);
+		}
+		else {
+			float aspectRatio = static_cast<float>(m_height) / m_width;
+			projection = glm::ortho(-1000.0f, 1000.0f, -1000.0f * aspectRatio, 1000.0f * aspectRatio, 0.0f, 1.0f);
+		}
+
 		vk::ArrayProxy<const PushConstants> pcs{ {
-			glm::ortho(0.0f, static_cast<float>(m_width), 0.0f, static_cast<float>(m_height), 0.0f, 1.0f),
+			projection,
 			std::get<vk::DeviceAddress>(m_frameIndex % 2 == 0 ? m_pingBuffer.ptr : m_pongBuffer.ptr),
 			std::get<vk::DeviceAddress>(m_frameIndex % 2 == 0 ? m_pongBuffer.ptr : m_pingBuffer.ptr),
-			currentTime - lastTime
+			std::min(currentTime - lastTime, 0.01f)
 		} };
 
 		lastTime = currentTime;
@@ -338,7 +344,6 @@ void Application::run() {
 
 		vk::Result result = m_queue.presentKHR({ frameData.presentSem, m_swapchain, imageIndex });
 		if(result != vk::Result::eSuccess || m_resizePending) {
-			m_resizePending = false;
 			recreateSwapchain();
 		}
 
@@ -347,8 +352,6 @@ void Application::run() {
 }
 
 void Application::onResize(int width, int height) {
-	m_width = width;
-	m_height = height;
 	m_resizePending = true;
 }
 
@@ -408,6 +411,8 @@ void Application::recreateSwapchain() {
 
 	destroySwapchain();
 	createSwapchain(m_width, m_height);
+
+	m_resizePending = false;
 }
 
 void Application::destroySwapchain() {

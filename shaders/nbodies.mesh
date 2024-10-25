@@ -28,7 +28,7 @@ layout(local_size_x = LOCAL_GROUP_SIZE) in;
 layout(points, max_vertices = NUM_PRIMITIVES, max_primitives = NUM_PRIMITIVES) out;
 
 float pointSize(float mass) {
-    return 9.5e-7f * mass + 4.9999905;   
+    return log(mass) + 1.7f; 
 }
 
 void main() {
