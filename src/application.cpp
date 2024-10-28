@@ -273,7 +273,6 @@ void Application::run() {
 		m_device.resetFences(frameData.fence);
 
 		vk::ImageSubresourceRange subresource{ vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 };
-		vk::ImageMemoryBarrier2 barrier;
 
 		m_device.resetCommandPool(frameData.cmdPool);
 		frameData.cmdBuffer.begin({ vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
@@ -336,6 +335,15 @@ void Application::run() {
 			vk::PipelineStageFlagBits::eColorAttachmentOutput,
 			vk::PipelineStageFlagBits::eBottomOfPipe
 		);
+
+		vk::BufferMemoryBarrier barrier;
+		barrier
+			.setSrcAccessMask(vk::AccessFlagBits::eMemoryWrite)
+			.setDstAccessMask(vk::AccessFlagBits::eMemoryRead | vk::AccessFlagBits::eMemoryWrite)
+			.setBuffer(m_frameIndex % 2 == 0 ? m_pongBuffer.buffer : m_pingBuffer.buffer)
+			.setSize(vk::WholeSize);
+
+		frameData.cmdBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eMeshShaderEXT, vk::PipelineStageFlagBits::eMeshShaderEXT, {}, {}, barrier, {});
 
 		frameData.cmdBuffer.end();
 
