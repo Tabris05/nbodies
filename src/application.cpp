@@ -295,8 +295,8 @@ void Application::run() {
 
 		vk::ArrayProxy<const PushConstants> pcs{ {
 			projection,
-			std::get<vk::DeviceAddress>(m_frameIndex % 2 == 0 ? m_pingBuffer.ptr : m_pongBuffer.ptr),
-			std::get<vk::DeviceAddress>(m_frameIndex % 2 == 0 ? m_pongBuffer.ptr : m_pingBuffer.ptr),
+			std::get<vk::DeviceAddress>(m_pingOrPong ? m_pingBuffer.ptr : m_pongBuffer.ptr),
+			std::get<vk::DeviceAddress>(m_pingOrPong ? m_pongBuffer.ptr : m_pingBuffer.ptr),
 			std::min(currentTime - lastTime, 0.01f)
 		} };
 
@@ -340,9 +340,9 @@ void Application::run() {
 		barrier
 			.setSrcAccessMask(vk::AccessFlagBits::eMemoryWrite)
 			.setDstAccessMask(vk::AccessFlagBits::eMemoryRead | vk::AccessFlagBits::eMemoryWrite)
-			.setBuffer(m_frameIndex % 2 == 0 ? m_pongBuffer.buffer : m_pingBuffer.buffer)
+			.setBuffer(m_pingOrPong ? m_pongBuffer.buffer : m_pingBuffer.buffer)
 			.setSize(vk::WholeSize);
-
+		
 		frameData.cmdBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eMeshShaderEXT, vk::PipelineStageFlagBits::eMeshShaderEXT, {}, {}, barrier, {});
 
 		frameData.cmdBuffer.end();
@@ -356,6 +356,7 @@ void Application::run() {
 		}
 
 		m_frameIndex = (m_frameIndex + 1) % m_framesInFlight;
+		m_pingOrPong ^= 1;
 	}
 }
 

@@ -75,6 +75,7 @@ class Application {
 
 		int m_width, m_height;
 		size_t m_frameIndex = 0;
+		bool m_pingOrPong = true;
 		bool m_resizePending = false;
 
 		std::vector<const char*> m_layers{
